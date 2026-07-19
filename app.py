@@ -1,21 +1,16 @@
-"""
-Obra del Día — Streamlit
-100% Python. Un cuadro nuevo cada día, seis intentos, revelado progresivo.
-Deploy: Streamlit Community Cloud → github.com/nmftstudio/obra
-"""
-
 import hashlib
 import unicodedata
 import re
-from datetime import date
+from datetime import datetime, date
 from io import BytesIO
+import random
 
 import requests
 import streamlit as st
 from PIL import Image, ImageFilter, ImageDraw
 
 # ──────────────────────────────────────────────
-# DATASET — 18 obras de dominio público (Wikimedia Commons)
+# DATASET — 17 obras de dominio público (Wikimedia Commons)
 # ──────────────────────────────────────────────
 PAINTINGS = [
     {
@@ -25,8 +20,6 @@ PAINTINGS = [
         "year": "c. 1503–1517",
         "museum": "Museo del Louvre, París",
         "file": "Mona_Lisa,_by_Leonardo_da_Vinci,_from_C2RMF_retouched.jpg",
-        "aliases": ["mona lisa", "la gioconda", "gioconda", "monna lisa"],
-        "artist_aliases": ["leonardo", "da vinci", "leonardo da vinci"],
         "fun_fact": "Fue robada del Louvre en 1911 por un empleado del museo, lo que la catapultó a la fama mundial.",
     },
     {
@@ -36,8 +29,6 @@ PAINTINGS = [
         "year": "1889",
         "museum": "MoMA, Nueva York",
         "file": "Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg",
-        "aliases": ["la noche estrellada", "noche estrellada", "starry night"],
-        "artist_aliases": ["van gogh", "vincent van gogh", "vincent"],
         "fun_fact": "Van Gogh la pintó desde la ventana de su cuarto en un sanatorio psiquiátrico.",
     },
     {
@@ -47,8 +38,6 @@ PAINTINGS = [
         "year": "1893",
         "museum": "Galería Nacional de Noruega, Oslo",
         "file": "Edvard_Munch,_1893,_The_Scream,_oil,_tempera_and_pastel_on_cardboard,_91_x_73_cm,_National_Gallery_of_Norway.jpg",
-        "aliases": ["el grito", "the scream", "grito"],
-        "artist_aliases": ["munch", "edvard munch"],
         "fun_fact": "Munch la pintó tras sentir 'un grito infinito atravesando la naturaleza' durante un atardecer.",
     },
     {
@@ -58,8 +47,6 @@ PAINTINGS = [
         "year": "c. 1665",
         "museum": "Mauritshuis, La Haya",
         "file": "1665_Girl_with_a_Pearl_Earring.jpg",
-        "aliases": ["la joven de la perla", "joven de la perla", "girl with a pearl earring", "la chica de la perla"],
-        "artist_aliases": ["vermeer", "johannes vermeer"],
         "fun_fact": "No es un retrato real sino un 'tronie', un estudio de expresión típico del barroco holandés.",
     },
     {
@@ -69,8 +56,6 @@ PAINTINGS = [
         "year": "c. 1831",
         "museum": "Varios museos (xilografía)",
         "file": "The_Great_Wave_off_Kanagawa.jpg",
-        "aliases": ["la gran ola", "la gran ola de kanagawa", "great wave", "the great wave"],
-        "artist_aliases": ["hokusai", "katsushika hokusai"],
         "fun_fact": "Es un grabado en madera, no una pintura única: se imprimieron miles de copias en su época.",
     },
     {
@@ -80,8 +65,6 @@ PAINTINGS = [
         "year": "1930",
         "museum": "Art Institute of Chicago",
         "file": "Grant_Wood_-_American_Gothic_-_Google_Art_Project.jpg",
-        "aliases": ["gotico americano", "gótico americano", "american gothic"],
-        "artist_aliases": ["grant wood"],
         "fun_fact": "Los modelos fueron la hermana del pintor y su dentista, no una pareja de granjeros real.",
     },
     {
@@ -91,8 +74,6 @@ PAINTINGS = [
         "year": "1872",
         "museum": "Museo Marmottan Monet, París",
         "file": "Monet_-_Impression,_Sunrise.jpg",
-        "aliases": ["impresion sol naciente", "impresión sol naciente", "impression sunrise"],
-        "artist_aliases": ["monet", "claude monet"],
         "fun_fact": "Le dio nombre a todo el movimiento Impresionista, usado al principio como burla por la crítica.",
     },
     {
@@ -102,8 +83,6 @@ PAINTINGS = [
         "year": "c. 1485",
         "museum": "Galería Uffizi, Florencia",
         "file": "Sandro_Botticelli_-_La_nascita_di_Venere_-_Google_Art_Project_-_edited.jpg",
-        "aliases": ["el nacimiento de venus", "nacimiento de venus", "birth of venus"],
-        "artist_aliases": ["botticelli", "sandro botticelli"],
         "fun_fact": "Está pintada sobre tela en vez de madera, algo inusual para su escala en el siglo XV.",
     },
     {
@@ -113,8 +92,6 @@ PAINTINGS = [
         "year": "1656",
         "museum": "Museo del Prado, Madrid",
         "file": "Las_Meninas,_by_Diego_Vel%C3%A1zquez,_from_Prado_in_Google_Earth.jpg",
-        "aliases": ["las meninas"],
-        "artist_aliases": ["velazquez", "velázquez", "diego velazquez"],
         "fun_fact": "El propio Velázquez se autorretrató en la escena, pincel en mano, mirando al espectador.",
     },
     {
@@ -124,8 +101,6 @@ PAINTINGS = [
         "year": "1642",
         "museum": "Rijksmuseum, Ámsterdam",
         "file": "The_Night_Watch_-_HD.jpg",
-        "aliases": ["la ronda de noche", "ronda de noche", "the night watch", "ronda nocturna"],
-        "artist_aliases": ["rembrandt"],
         "fun_fact": "Pese al nombre, no transcurre de noche: siglos de barniz oscurecido le dieron esa apariencia.",
     },
     {
@@ -135,8 +110,6 @@ PAINTINGS = [
         "year": "1908",
         "museum": "Belvedere, Viena",
         "file": "Gustav_Klimt_016.jpg",
-        "aliases": ["el beso", "the kiss"],
-        "artist_aliases": ["klimt", "gustav klimt"],
         "fun_fact": "Usó pan de oro real, una técnica heredada del trabajo de orfebre de su padre.",
     },
     {
@@ -146,8 +119,6 @@ PAINTINGS = [
         "year": "1830",
         "museum": "Museo del Louvre, París",
         "file": "Eug%C3%A8ne_Delacroix_-_La_libert%C3%A9_guidant_le_peuple.jpg",
-        "aliases": ["la libertad guiando al pueblo", "libertad guiando al pueblo", "liberty leading the people"],
-        "artist_aliases": ["delacroix", "eugene delacroix"],
         "fun_fact": "Conmemora la Revolución de Julio de 1830, no la Revolución Francesa de 1789 como muchos creen.",
     },
     {
@@ -157,8 +128,6 @@ PAINTINGS = [
         "year": "c. 1500",
         "museum": "Museo del Prado, Madrid",
         "file": "The_Garden_of_earthly_delights.jpg",
-        "aliases": ["el jardin de las delicias", "jardin de las delicias", "garden of earthly delights"],
-        "artist_aliases": ["el bosco", "hieronymus bosch", "bosco", "bosch"],
         "fun_fact": "Es un tríptico: al cerrar sus puertas se revela otra pintura del mundo antes de la creación de Eva.",
     },
     {
@@ -168,8 +137,6 @@ PAINTINGS = [
         "year": "c. 1818",
         "museum": "Kunsthalle de Hamburgo",
         "file": "Caspar_David_Friedrich_-_Wanderer_above_the_Sea_of_Fog.jpeg",
-        "aliases": ["el caminante sobre el mar de nubes", "caminante sobre el mar de nubes", "wanderer above the sea of fog"],
-        "artist_aliases": ["caspar david friedrich", "friedrich"],
         "fun_fact": "Se convirtió en el ícono visual del Romanticismo alemán.",
     },
     {
@@ -179,8 +146,6 @@ PAINTINGS = [
         "year": "1814",
         "museum": "Museo del Prado, Madrid",
         "file": "El_Tres_de_Mayo,_by_Francisco_de_Goya,_from_Prado_in_Google_Earth.jpg",
-        "aliases": ["el tres de mayo", "tres de mayo", "el tres de mayo de 1808", "third of may"],
-        "artist_aliases": ["goya", "francisco de goya"],
         "fun_fact": "Una de las primeras obras que retrata la guerra moderna sin idealizar a los vencedores.",
     },
     {
@@ -190,8 +155,6 @@ PAINTINGS = [
         "year": "1923",
         "museum": "Museo Guggenheim, Nueva York",
         "file": "Vassily_Kandinsky,_1923_-_Composition_8,_Guggenheim_Museum.jpg",
-        "aliases": ["composicion viii", "composición viii", "composition 8", "composition viii"],
-        "artist_aliases": ["kandinsky", "vasili kandinsky", "wassily kandinsky"],
         "fun_fact": "Kandinsky sostenía que ciertos colores y formas producían sonidos: sinestesia.",
     },
     {
@@ -201,64 +164,35 @@ PAINTINGS = [
         "year": "1884–1886",
         "museum": "Art Institute of Chicago",
         "file": "A_Sunday_on_La_Grande_Jatte,_Georges_Seurat,_1884.jpg",
-        "aliases": ["la grande jatte", "domingo en la grande jatte", "grande jatte"],
-        "artist_aliases": ["seurat", "georges seurat"],
         "fun_fact": "Pintada con puntillismo: miles de puntitos de color puro que el ojo mezcla a distancia.",
     },
 ]
 
 MAX_ATTEMPTS = 6
-
-# Niveles de desenfoque (radio de blur) por intento — decrece hasta 0
 BLUR_LEVELS = [28, 20, 13, 7, 3, 0]
-
-# Porcentaje del cuadro visible por intento (ventana central que se revela)
 CROP_SIZES = [0.18, 0.30, 0.46, 0.64, 0.82, 1.0]
-
 
 # ──────────────────────────────────────────────
 # LÓGICA
 # ──────────────────────────────────────────────
 
-def painting_of_the_day() -> dict:
-    seed = date.today().isoformat()
-    digest = hashlib.sha256(seed.encode()).hexdigest()
-    return PAINTINGS[int(digest, 16) % len(PAINTINGS)]
-
-
-def normalize(text: str) -> str:
-    text = text.strip().lower()
-    text = unicodedata.normalize("NFKD", text)
-    text = "".join(c for c in text if not unicodedata.combining(c))
-    text = re.sub(r"[^a-z0-9\s]", "", text)
-    return re.sub(r"\s+", " ", text).strip()
-
-
-def check_guess(painting: dict, guess: str) -> str:
-    """Retorna 'correct', 'close' o 'miss'."""
-    g = normalize(guess)
-    if not g:
-        return "empty"
-    if g == normalize(painting["title"]) or g in [normalize(a) for a in painting["aliases"]]:
+def check_choice(correct_painting, selected_id):
+    if selected_id == correct_painting["id"]:
         return "correct"
-    if g in [normalize(a) for a in painting["artist_aliases"]]:
-        return "correct"
-    # "cerca": comparte al menos una palabra larga con el título
-    gw = set(w for w in g.split() if len(w) > 3)
-    tw = set(w for w in normalize(painting["title"]).split() if len(w) > 3)
-    if gw & tw:
+    
+    selected_painting = next(p for p in PAINTINGS if p["id"] == selected_id)
+    if selected_painting["artist"] == correct_painting["artist"]:
         return "close"
     return "miss"
 
 
 @st.cache_data(show_spinner=False)
-def load_image(filename: str) -> Image.Image | None:
+def load_image(filename):
     url = f"https://commons.wikimedia.org/wiki/Special:FilePath/{filename}?width=900"
     try:
-        r = requests.get(url, timeout=15, headers={"User-Agent": "ObraDelDia/1.0"})
+        r = requests.get(url, timeout=15, headers={"User-Agent": "ObraMisteriosa/1.0"})
         r.raise_for_status()
         img = Image.open(BytesIO(r.content)).convert("RGB")
-        # cuadrar con crop centrado
         w, h = img.size
         side = min(w, h)
         left = (w - side) // 2
@@ -268,14 +202,12 @@ def load_image(filename: str) -> Image.Image | None:
         return None
 
 
-def apply_reveal(img: Image.Image, attempt: int) -> Image.Image:
-    """Blur + ventana circular que se agranda con cada intento."""
+def apply_reveal(img, attempt):
     step = min(attempt, len(BLUR_LEVELS) - 1)
     blur_r = BLUR_LEVELS[step]
     crop_pct = CROP_SIZES[step]
 
-    w, h = img.size  # 600×600
-
+    w, h = img.size
     if blur_r > 0:
         blurred = img.filter(ImageFilter.GaussianBlur(radius=blur_r))
     else:
@@ -284,23 +216,17 @@ def apply_reveal(img: Image.Image, attempt: int) -> Image.Image:
     if crop_pct >= 1.0:
         return blurred
 
-    # máscara circular que crece
     radius = int((w / 2) * crop_pct)
     cx, cy = w // 2, h // 2
 
     mask = Image.new("L", (w, h), 0)
     draw = ImageDraw.Draw(mask)
-    draw.ellipse(
-        (cx - radius, cy - radius, cx + radius, cy + radius),
-        fill=255,
-    )
-    # difuminar el borde de la máscara
+    draw.ellipse((cx - radius, cy - radius, cx + radius, cy + radius), fill=255)
     mask = mask.filter(ImageFilter.GaussianBlur(radius=max(radius // 5, 4)))
 
     dark = Image.new("RGB", (w, h), (18, 14, 18))
     result = Image.composite(blurred, dark, mask)
     return result
-
 
 # ──────────────────────────────────────────────
 # CSS PERSONALIZADO
@@ -308,7 +234,7 @@ def apply_reveal(img: Image.Image, attempt: int) -> Image.Image:
 
 CSS = """
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;1,500&family=Inter:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght=0,600;1,500&family=Inter:wght@400;500;700&display=swap');
 
 html, body, [data-testid="stAppViewContainer"] {
     background: #141014 !important;
@@ -319,7 +245,6 @@ html, body, [data-testid="stAppViewContainer"] {
 [data-testid="stHeader"] { background: transparent !important; }
 [data-testid="stSidebar"] { display: none; }
 
-/* ── tipografía ── */
 h1 {
     font-family: 'Cormorant Garamond', Georgia, serif !important;
     font-size: 2rem !important;
@@ -332,20 +257,16 @@ p, label, .stMarkdown, .stText {
     color: #a99da2 !important;
 }
 
-/* ── input ── */
-input[type="text"] {
+div[data-baseweb="select"] {
     background: #1c161b !important;
-    border: 1px solid #3a2f36 !important;
     border-radius: 6px !important;
-    color: #f2ece2 !important;
-    font-family: 'Inter', sans-serif !important;
 }
-input[type="text"]:focus {
-    border-color: #8a7326 !important;
-    box-shadow: 0 0 0 2px rgba(201,162,39,0.15) !important;
+div[data-baseweb="select"] > div {
+    background: #1c161b !important;
+    color: #f2ece2 !important;
+    border-color: #3a2f36 !important;
 }
 
-/* ── botón principal ── */
 [data-testid="baseButton-primary"] > button,
 .stButton > button[kind="primary"] {
     background: #c9a227 !important;
@@ -362,7 +283,6 @@ input[type="text"]:focus {
     font-family: 'Inter', sans-serif !important;
 }
 
-/* ── imagen / frame ── */
 [data-testid="stImage"] img {
     border-radius: 4px;
     box-shadow:
@@ -373,7 +293,6 @@ input[type="text"]:focus {
     margin: 0 auto;
 }
 
-/* ── intentos dots ── */
 .dot-row { display: flex; gap: 8px; justify-content: center; margin: 12px 0; }
 .dot {
     width: 32px; height: 32px; border-radius: 50%;
@@ -386,12 +305,10 @@ input[type="text"]:focus {
 .dot-close   { background:#1c161b; border:1px solid #8a7326; color:#c9a227; }
 .dot-hit     { background:#7fae6d; border:1px solid #7fae6d; color:#10240c; }
 
-/* ── feedback ── */
 .feedback-miss  { color:#a83f4f; font-weight:600; text-align:center; }
 .feedback-close { color:#c9a227; font-weight:600; text-align:center; }
 .feedback-hit   { color:#7fae6d; font-weight:600; text-align:center; }
 
-/* ── result card ── */
 .result-card {
     background: #1c161b;
     border: 1px solid #3a2f36;
@@ -408,7 +325,6 @@ input[type="text"]:focus {
 .result-meta { color: #8a7326 !important; font-size: 0.8rem !important; margin: 0 0 10px; }
 .result-fact { color: #a99da2 !important; font-size: 0.9rem !important; line-height: 1.5; }
 
-/* ── eyebrow ── */
 .eyebrow {
     font-family: 'Inter', sans-serif;
     font-size: 0.72rem;
@@ -427,7 +343,6 @@ input[type="text"]:focus {
     margin-top: 8px;
 }
 
-/* ── footer ── */
 .footer {
     text-align: center;
     font-size: 0.75rem;
@@ -444,13 +359,27 @@ input[type="text"]:focus {
 # ──────────────────────────────────────────────
 
 def init_state():
-    painting = painting_of_the_day()
-    today = date.today().isoformat()
+    now = datetime.now()
+    hour_seed = f"{now.date().isoformat()}_{now.hour}"
 
-    if "date" not in st.session_state or st.session_state.date != today:
-        st.session_state.date = today
-        st.session_state.painting = painting
-        st.session_state.attempts = []   # lista de dicts: {guess, result}
+    if "hour_seed" not in st.session_state or st.session_state.hour_seed != hour_seed:
+        st.session_state.hour_seed = hour_seed
+        
+        digest = hashlib.sha256(hour_seed.encode()).hexdigest()
+        seed_int = int(digest, 16)
+        
+        correct_painting = PAINTINGS[seed_int % len(PAINTINGS)]
+        st.session_state.painting = correct_painting
+        
+        r = random.Random(seed_int)
+        other_paintings = [p for p in PAINTINGS if p["id"] != correct_painting["id"]]
+        
+        incorrect_choices = r.sample(other_paintings, min(11, len(other_paintings)))
+        choices = [correct_painting] + incorrect_choices
+        r.shuffle(choices)
+        
+        st.session_state.options = choices
+        st.session_state.attempts = []
         st.session_state.finished = False
         st.session_state.won = False
 
@@ -460,7 +389,7 @@ def init_state():
 
 def main():
     st.set_page_config(
-        page_title="Obra del Día",
+        page_title="La Obra Misteriosa",
         page_icon="◆",
         layout="centered",
     )
@@ -468,20 +397,19 @@ def main():
     init_state()
 
     painting = st.session_state.painting
+    options = st.session_state.options
     attempts = st.session_state.attempts
     attempt_count = len(attempts)
 
-    # ── header ──
-    st.markdown('<p class="eyebrow">◆ Obra del Día</p>', unsafe_allow_html=True)
+    option_labels = [f"{p['title']} — {p['artist']}" for p in options]
+
+    st.markdown('<p class="eyebrow">◆ La Obra Misteriosa</p>', unsafe_allow_html=True)
     st.title("¿Qué obra es esta?")
 
-    d = date.today()
-    fecha = d.strftime("%-d de %B de %Y").lower()
-    # capitalizar primer letra
-    fecha = fecha[0].upper() + fecha[1:]
-    st.markdown(f'<p class="eyebrow">{fecha}</p>', unsafe_allow_html=True)
+    now = datetime.now()
+    fecha_hora = f"{now.strftime('%d/%m/%Y')} · {now.hour}:00 hs"
+    st.markdown(f'<p class="eyebrow">Edición: {fecha_hora}</p>', unsafe_allow_html=True)
 
-    # ── imagen ──
     img = load_image(painting["file"])
 
     col1, col2, col3 = st.columns([1, 3, 1])
@@ -505,7 +433,6 @@ def main():
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # ── dots de intentos ──
     dots_html = '<div class="dot-row">'
     for i in range(MAX_ATTEMPTS):
         if i < len(attempts):
@@ -519,7 +446,6 @@ def main():
     dots_html += "</div>"
     st.markdown(dots_html, unsafe_allow_html=True)
 
-    # ── último feedback ──
     if attempts:
         last = attempts[-1]
         r = last["result"]
@@ -527,29 +453,36 @@ def main():
             msg = f"¡Exacto! Es «{painting['title']}»"
             cls = "hit"
         elif r == "close":
-            msg = f"Cerca… pero no es «{last['guess']}»"
+            msg = f"¡Mismo artista! Pero no es la obra «{last['guess']}»"
             cls = "close"
         else:
             msg = f"No es «{last['guess']}», seguí intentando"
             cls = "miss"
         st.markdown(f'<p class="feedback-{cls}">{msg}</p>', unsafe_allow_html=True)
 
-    # ── formulario de intento ──
     if not st.session_state.finished:
-        with st.form("guess_form", clear_on_submit=True):
-            guess = st.text_input(
-                "Tu respuesta",
-                placeholder="Título de la obra o nombre del artista…",
-                label_visibility="collapsed",
+        with st.form("guess_form", clear_on_submit=False):
+            selected_label = st.selectbox(
+                "Selecciona una obra",
+                options=option_labels,
+                index=None,
+                placeholder="Elegí una de las 12 opciones...",
+                label_visibility="collapsed"
             )
             submitted = st.form_submit_button("Adivinar", type="primary", use_container_width=True)
 
         if submitted:
-            if not guess.strip():
-                st.warning("Escribí algo antes de adivinar.")
+            if not selected_label:
+                st.warning("Por favor, selecciona una opción antes de confirmar.")
             else:
-                result = check_guess(painting, guess)
-                st.session_state.attempts.append({"guess": guess.strip(), "result": result})
+                idx = option_labels.index(selected_label)
+                chosen_painting = options[idx]
+                
+                result = check_choice(painting, chosen_painting["id"])
+                st.session_state.attempts.append({
+                    "guess": chosen_painting["title"], 
+                    "result": result
+                })
 
                 if result == "correct":
                     st.session_state.finished = True
@@ -560,7 +493,6 @@ def main():
 
                 st.rerun()
 
-    # ── resultado final ──
     if st.session_state.finished:
         won = st.session_state.won
         emoji_row = ""
@@ -580,16 +512,14 @@ def main():
             unsafe_allow_html=True,
         )
 
-        share_text = f"Obra del Día — {date.today().isoformat()}\n{emoji_row}\nnmft.ar"
+        share_text = f"La Obra Misteriosa — {now.strftime('%Y-%m-%d %H:00')}\\n{emoji_row}\\nnmft.ar"
         st.code(share_text, language=None)
         st.caption("Copiá el texto de arriba para compartir tu resultado.")
 
-    # ── footer ──
     st.markdown(
         '<div class="footer">Un juego de <a href="https://nmft.ar" target="_blank">NMFT STUDIO</a></div>',
         unsafe_allow_html=True,
     )
-
 
 if __name__ == "__main__":
     main()
