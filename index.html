@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, viewport-fit=cover">
+<title>易經 · El Oráculo de las Mutaciones</title>
+<meta name="description" content="Consultá el I Ching agitando tu celular: el ritual de las tres monedas, los 64 hexagramas con su narración completa, y los Acertijos del Sabio.">
+<meta name="theme-color" content="#1b140d">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700;900&family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400;1,500&family=Ma+Shan+Zheng&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<canvas id="paper-bg"></canvas>
+<div class="vignette"></div>
+
+<main>
+  <div class="stage">
+
+    <!-- LANDING -->
+    <section id="screen-landing">
+      <div class="seal">易</div>
+      <div class="eyebrow">Método de las tres monedas</div>
+      <h1>I Ching</h1>
+      <div class="cn-title">易經 · el libro de los cambios</div>
+      <p class="lead">Seis líneas se forman de abajo hacia arriba, tres monedas a la vez. Agitá tu celular para tirarlas — o tocá el altar si preferís.</p>
+      <button class="primary" id="btn-start">Comenzar la consulta</button>
+      <div class="nav-links">
+        <button type="button" id="btn-open-game-from-landing">🧩 Acertijos del Sabio</button>
+        <button type="button" id="btn-open-info">ℹ️ Cómo funciona</button>
+      </div>
+    </section>
+
+    <!-- TOSSING -->
+    <section id="screen-toss" class="hidden">
+      <div class="hex-building" id="hex-building"></div>
+      <div class="altar" id="altar">
+        <div class="coins" id="coins">
+          <div class="coin"><div class="coin-face coin-front"><div class="hole"></div></div><div class="coin-face coin-back"></div></div>
+          <div class="coin"><div class="coin-face coin-front"><div class="hole"></div></div><div class="coin-face coin-back"></div></div>
+          <div class="coin"><div class="coin-face coin-front"><div class="hole"></div></div><div class="coin-face coin-back"></div></div>
+        </div>
+      </div>
+      <div class="caption" id="caption">Preparando la tirada...</div>
+    </section>
+
+    <!-- REVEAL -->
+    <section id="screen-reveal" class="hidden">
+      <div class="scroll-edge"></div>
+      <div class="scroll" id="scroll-primary">
+        <div class="scroll-inner">
+          <div class="stamp" id="stamp">卦</div>
+          <div class="hex-number" id="out-number"></div>
+          <div class="hex-glyph" id="out-glyph"></div>
+          <div class="hex-cn" id="out-cn"></div>
+          <div class="hex-py" id="out-py"></div>
+          <div class="hex-name" id="out-name"></div>
+          <div class="hex-subtitle" id="out-subtitle"></div>
+          <div class="trigram-row" id="out-trigrams"></div>
+          <div class="hex-lines-final" id="out-lines"></div>
+
+          <p class="essence" id="out-essence"></p>
+          <p class="narrative" id="out-narrative"></p>
+
+          <button class="btn-expand" id="btn-expand-out" type="button" aria-expanded="false">Ver dictamen e imagen ▾</button>
+          <div class="expand-block" id="expand-out">
+            <h4>Dictamen</h4>
+            <p id="out-dictamen"></p>
+            <h4>Imagen</h4>
+            <p id="out-imagen"></p>
+          </div>
+
+          <div class="changing-lines hidden" id="changing-lines-box">
+            <h4>Líneas cambiantes</h4>
+            <div id="changing-lines-text"></div>
+          </div>
+
+          <div class="transform-note hidden" id="transform-note">
+            Hay líneas en movimiento. <a id="btn-show-transform">Ver el hexagrama de transformación →</a>
+          </div>
+        </div>
+      </div>
+      <div class="scroll-edge bottom"></div>
+
+      <div id="screen-transform" class="hidden">
+        <div class="scroll-edge"></div>
+        <div class="scroll open">
+          <div class="scroll-inner">
+            <div class="hex-number">Se transforma en</div>
+            <div class="hex-glyph" id="t-glyph"></div>
+            <div class="hex-cn" id="t-cn"></div>
+            <div class="hex-py" id="t-py"></div>
+            <div class="hex-name" id="t-name"></div>
+            <div class="hex-subtitle" id="t-subtitle"></div>
+
+            <p class="essence" id="t-essence"></p>
+            <p class="narrative" id="t-narrative"></p>
+
+            <button class="btn-expand" id="btn-expand-t" type="button" aria-expanded="false">Ver dictamen e imagen ▾</button>
+            <div class="expand-block" id="expand-t">
+              <h4>Dictamen</h4>
+              <p id="t-dictamen"></p>
+              <h4>Imagen</h4>
+              <p id="t-imagen"></p>
+            </div>
+          </div>
+        </div>
+        <div class="scroll-edge bottom"></div>
+      </div>
+
+      <div class="actions-row">
+        <button class="ghost" id="btn-again">Nueva consulta</button>
+        <button class="ghost" id="btn-open-game-from-reveal">🧩 Acertijos del Sabio</button>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<!-- Overlay: Acertijos del Sabio (minijuego) -->
+<div class="overlay" id="overlay-game" role="dialog" aria-modal="true" aria-labelledby="game-title">
+  <div class="game-window">
+    <button class="game-close" id="btn-close-game" type="button" aria-label="Cerrar">✕</button>
+
+    <div id="game-view-intro">
+      <h2 class="game-title" id="game-title">🧩 Acertijos del Sabio</h2>
+      <p class="game-intro-text">Preguntas de sabiduría oriental y antiguos enigmas de lógica para poner a prueba tu ingenio. Diez desafíos, elegidos al azar entre trivia y acertijos — con opciones mezcladas para que ninguna respuesta se note a simple vista.</p>
+      <button class="primary" id="btn-start-game" type="button">Comenzar</button>
+    </div>
+
+    <div id="game-view-question" class="hidden">
+      <div class="game-progress">
+        <span id="game-progress-text"></span>
+        <span id="game-score-text"></span>
+      </div>
+      <span class="game-tag" id="game-tag"></span>
+      <p class="game-question" id="game-question-text"></p>
+      <div class="game-options" id="game-options"></div>
+      <div class="game-feedback hidden" id="game-feedback"></div>
+      <button class="primary hidden" id="btn-next-question" type="button">Siguiente →</button>
+    </div>
+
+    <div id="game-view-end" class="hidden">
+      <h2 class="game-title">Fin de la consulta</h2>
+      <p class="game-final-score" id="game-final-score"></p>
+      <p class="game-final-rank" id="game-final-rank"></p>
+      <button class="primary" id="btn-play-again" type="button">Jugar de nuevo</button>
+    </div>
+  </div>
+</div>
+
+<!-- Overlay: cómo funciona -->
+<div class="overlay" id="overlay-info" role="dialog" aria-modal="true" aria-labelledby="info-title">
+  <div class="game-window">
+    <button class="game-close" id="btn-close-info" type="button" aria-label="Cerrar">✕</button>
+    <h2 class="game-title" id="info-title">ℹ️ Cómo funciona</h2>
+    <p class="game-intro-text" style="text-align:left">
+      Esta consulta reproduce el método tradicional de las tres monedas. Cada agitada del celular —o cada toque del altar, si preferís no agitar— lanza tres monedas al mismo tiempo.<br><br>
+      Cara vale 3, cruz vale 2. La suma de las tres monedas da 6, 7, 8 o 9, y determina el tipo de línea:<br><br>
+      <strong>9</strong> — yang viejo (cambiante) &nbsp;·&nbsp; <strong>8</strong> — yin joven (estable)<br>
+      <strong>7</strong> — yang joven (estable) &nbsp;·&nbsp; <strong>6</strong> — yin viejo (cambiante)<br><br>
+      Repetís el lanzamiento seis veces, de abajo hacia arriba, hasta formar el hexagrama completo. Si alguna línea es "vieja" (6 o 9), está en transformación: esas líneas se invierten para revelar un segundo hexagrama, el resultante, que muestra hacia dónde se dirige la situación.<br><br>
+      Todo el sistema —los 64 hexagramas, su orden y sus caracteres— sigue la secuencia King Wen tradicional.
+    </p>
+  </div>
+</div>
+
+<script src="data.js"></script>
+<script src="riddles.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

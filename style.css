@@ -1,0 +1,581 @@
+/* ============================================================
+   易經 · EL ORÁCULO DE LAS MUTACIONES — hoja de estilos
+   Base: shell de monedas/altar/pergamino (V3), extendida con
+   narración completa del hexagrama y el minijuego de acertijos.
+   ============================================================ */
+:root{
+  --paper:#e9d9b8;
+  --paper-2:#dfc9a0;
+  --paper-deep:#cdb488;
+  --ink:#2b2018;
+  --ink-soft:#5b4636;
+  --vermillion:#a8341f;
+  --vermillion-deep:#7c2415;
+  --bronze:#9c7a3c;
+  --bronze-light:#d8b464;
+  --jade:#4f6a52;
+  --jade-deep:#374d3a;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+html,body{height:100%;}
+body{
+  font-family:'EB Garamond', serif;
+  color:var(--ink);
+  min-height:100vh;
+  overflow-x:hidden;
+  position:relative;
+  background:var(--paper);
+}
+
+/* ---- textura de papel envejecido ---- */
+#paper-bg{ position:fixed; inset:0; z-index:0; pointer-events:none; }
+.vignette{
+  position:fixed; inset:0; z-index:1; pointer-events:none;
+  background:radial-gradient(ellipse at 50% 40%, transparent 40%, rgba(43,32,24,0.28) 100%);
+}
+.stain{
+  position:fixed; border-radius:50%; pointer-events:none; z-index:1;
+  background:radial-gradient(circle, rgba(124,66,32,0.10), transparent 70%);
+  filter:blur(2px);
+}
+
+/* ---- humo de incienso ---- */
+.incense{ position:fixed; bottom:0; width:2px; pointer-events:none; z-index:1; opacity:0; }
+.incense svg{ width:60px; height:340px; overflow:visible; }
+
+main{
+  position:relative; z-index:2;
+  min-height:100vh;
+  display:flex; align-items:center; justify-content:center;
+  padding:32px 18px;
+}
+
+.stage{
+  width:100%; max-width:460px;
+  display:flex; flex-direction:column; align-items:center; text-align:center;
+}
+
+.seal{
+  width:44px; height:44px;
+  background:var(--vermillion);
+  border-radius:3px;
+  display:flex; align-items:center; justify-content:center;
+  color:var(--paper);
+  font-family:'Ma Shan Zheng', cursive;
+  font-size:24px;
+  box-shadow:0 3px 8px rgba(43,32,24,0.35), inset 0 0 0 1px rgba(233,217,184,0.3);
+  margin-bottom:18px;
+  transform:rotate(-3deg);
+}
+
+.eyebrow{
+  font-family:'EB Garamond', serif;
+  font-variant:small-caps;
+  letter-spacing:0.18em;
+  font-size:14px;
+  color:var(--ink-soft);
+  margin-bottom:6px;
+}
+
+h1{
+  font-family:'Noto Serif SC', serif;
+  font-weight:700;
+  font-size:clamp(30px, 8vw, 44px);
+  color:var(--ink);
+  line-height:1.15;
+  margin-bottom:6px;
+}
+
+.cn-title{
+  font-family:'Ma Shan Zheng', cursive;
+  font-size:22px;
+  color:var(--vermillion);
+  margin-bottom:22px;
+  letter-spacing:0.1em;
+}
+
+p.lead{
+  font-size:17px;
+  line-height:1.65;
+  color:var(--ink-soft);
+  max-width:360px;
+  margin-bottom:34px;
+  font-style:italic;
+}
+
+button.primary{
+  font-family:'EB Garamond', serif;
+  font-variant:small-caps;
+  font-size:16px;
+  letter-spacing:0.06em;
+  background:var(--ink);
+  color:var(--paper);
+  border:none;
+  padding:15px 34px;
+  border-radius:2px;
+  cursor:pointer;
+  transition:all .25s ease;
+  box-shadow:0 4px 14px rgba(43,32,24,0.3);
+}
+button.primary:hover{ background:var(--vermillion-deep); transform:translateY(-1px); }
+button.primary:focus-visible{ outline:2px solid var(--vermillion); outline-offset:3px; }
+button.primary:disabled{ opacity:0.5; cursor:default; transform:none; }
+
+button.ghost{
+  font-family:'EB Garamond', serif;
+  font-variant:small-caps;
+  font-size:14px;
+  letter-spacing:0.05em;
+  background:none;
+  border:1px solid var(--ink-soft);
+  color:var(--ink-soft);
+  padding:10px 20px;
+  border-radius:2px;
+  cursor:pointer;
+  margin-top:14px;
+}
+button.ghost:hover{ border-color:var(--vermillion); color:var(--vermillion); }
+
+.hidden{ display:none !important; }
+
+.actions-row{ display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-top:6px; }
+
+/* ---- pantalla de tirada ---- */
+.altar{
+  width:280px; height:200px;
+  position:relative;
+  margin-bottom:20px;
+  border-radius:6px;
+  background:
+    radial-gradient(ellipse at 50% 20%, rgba(0,0,0,0.08), transparent 60%),
+    linear-gradient(160deg, #6b4a26, #4a3319 85%);
+  box-shadow:0 10px 30px rgba(43,32,24,0.35), inset 0 0 40px rgba(0,0,0,0.3);
+  display:flex; align-items:center; justify-content:center;
+  perspective:600px;
+  cursor:pointer;
+}
+.coins{ display:flex; gap:18px; }
+.coin{
+  width:58px; height:58px;
+  position:relative;
+  transform-style:preserve-3d;
+}
+.coin-face{
+  position:absolute; inset:0;
+  border-radius:50%;
+  backface-visibility:hidden;
+  display:flex; align-items:center; justify-content:center;
+}
+.coin-front{
+  background:radial-gradient(circle at 35% 30%, var(--bronze-light), var(--bronze) 55%, #6b5023 100%);
+  box-shadow:inset 0 0 10px rgba(0,0,0,0.35), 0 2px 4px rgba(0,0,0,0.3);
+}
+.coin-front .hole{
+  width:16px; height:16px;
+  background:#4a3319;
+  transform:rotate(45deg);
+  box-shadow:inset 0 0 4px rgba(0,0,0,0.6);
+}
+.coin-back{
+  background:radial-gradient(circle at 35% 30%, #c7a25e, #8a6a34 55%, #5c4420 100%);
+  transform:rotateX(180deg);
+  box-shadow:inset 0 0 10px rgba(0,0,0,0.35), 0 2px 4px rgba(0,0,0,0.3);
+}
+.coin-back::after{
+  content:''; width:34px; height:34px; border-radius:50%;
+  border:1px solid rgba(43,32,24,0.35);
+}
+
+.caption{
+  font-family:'EB Garamond', serif;
+  font-style:italic;
+  font-size:15px;
+  color:var(--ink-soft);
+  min-height:24px;
+  margin-bottom:18px;
+}
+
+.hex-building{
+  display:flex; flex-direction:column-reverse;
+  gap:7px;
+  align-items:center;
+  margin-bottom:10px;
+}
+.line-row{
+  display:flex; align-items:center; gap:6px;
+  opacity:0; transform:translateY(8px);
+  animation:line-in .5s forwards;
+}
+@keyframes line-in{ to{ opacity:1; transform:translateY(0); } }
+.bar{
+  width:64px; height:9px; background:var(--ink); border-radius:1px;
+}
+.bar.yin{ display:flex; justify-content:space-between; width:64px; background:none; }
+.bar.yin .half{ width:27px; height:9px; background:var(--ink); border-radius:1px; }
+.mark{ font-size:13px; color:var(--vermillion); width:14px; text-align:center; font-weight:600; }
+
+/* ---- pantalla de revelacion: pergamino ---- */
+.scroll{
+  width:100%;
+  max-width:400px;
+  background:
+    radial-gradient(circle at 20% 15%, rgba(124,66,32,0.06), transparent 40%),
+    linear-gradient(160deg, var(--paper-2), var(--paper));
+  box-shadow:0 14px 40px rgba(43,32,24,0.3);
+  position:relative;
+  overflow:hidden;
+  max-height:0;
+  transition:max-height 1.1s cubic-bezier(.2,.8,.25,1);
+}
+.scroll.open{ max-height:4000px; }
+.scroll-inner{ padding:34px 26px 30px; }
+.scroll-edge{
+  height:12px;
+  background:
+    linear-gradient(135deg, transparent 50%, var(--paper) 50%) 0 0/14px 14px repeat-x,
+    linear-gradient(225deg, transparent 50%, var(--paper) 50%) 0 0/14px 14px repeat-x;
+}
+.scroll-edge.bottom{ transform:rotate(180deg); }
+
+.hex-number{
+  font-family:'EB Garamond', serif;
+  font-variant:small-caps;
+  letter-spacing:0.15em;
+  font-size:13px;
+  color:var(--ink-soft);
+  margin-bottom:10px;
+}
+.hex-glyph{
+  font-size:64px;
+  line-height:1;
+  color:var(--ink);
+  margin-bottom:6px;
+}
+.hex-cn{
+  font-family:'Ma Shan Zheng', cursive;
+  font-size:34px;
+  color:var(--vermillion);
+  line-height:1.2;
+}
+.hex-py{
+  font-family:'EB Garamond', serif;
+  font-style:italic;
+  font-size:15px;
+  color:var(--ink-soft);
+  margin-bottom:4px;
+}
+.hex-name{
+  font-family:'Noto Serif SC', serif;
+  font-weight:700;
+  font-size:22px;
+  margin:6px 0 4px;
+}
+.hex-subtitle{
+  font-size:14px;
+  font-style:italic;
+  color:var(--ink-soft);
+  margin-bottom:14px;
+}
+.trigram-row{
+  display:flex; justify-content:center; gap:22px;
+  font-size:13px; color:var(--ink-soft);
+  font-variant:small-caps; letter-spacing:0.06em;
+  margin-bottom:18px;
+  flex-wrap:wrap;
+}
+.trigram-row span.sym{ font-size:18px; color:var(--vermillion); margin-right:4px; }
+
+.hex-lines-final{
+  display:flex; flex-direction:column-reverse; gap:6px; align-items:center;
+  margin-bottom:20px;
+}
+.hex-lines-final .line-row{ opacity:1; transform:none; animation:none; }
+
+.essence{
+  font-size:16px;
+  font-weight:600;
+  color:var(--vermillion-deep);
+  font-style:italic;
+  margin-bottom:14px;
+  border-top:1px solid var(--paper-deep);
+  padding-top:16px;
+}
+
+.narrative{
+  font-size:17px;
+  line-height:1.7;
+  font-style:italic;
+  color:var(--ink);
+  margin-bottom:8px;
+  text-align:left;
+}
+
+.expand-block{
+  text-align:left;
+  margin-top:6px;
+  max-height:0;
+  overflow:hidden;
+  transition:max-height .6s ease;
+}
+.expand-block.open{ max-height:1200px; }
+.expand-block h4{
+  font-family:'EB Garamond', serif;
+  font-variant:small-caps;
+  letter-spacing:0.1em;
+  font-size:14px;
+  color:var(--vermillion-deep);
+  margin-top:16px;
+  margin-bottom:6px;
+}
+.expand-block p{
+  font-size:15.5px;
+  line-height:1.65;
+  color:var(--ink-soft);
+}
+
+.btn-expand{
+  font-family:'EB Garamond', serif;
+  font-variant:small-caps;
+  font-size:13.5px;
+  letter-spacing:0.05em;
+  background:none;
+  border:none;
+  color:var(--vermillion-deep);
+  cursor:pointer;
+  padding:6px 0;
+  margin-top:10px;
+  text-align:left;
+  text-decoration:underline;
+}
+
+.transform-note{
+  margin-top:18px;
+  font-size:13.5px;
+  color:var(--ink-soft);
+  border-top:1px solid var(--paper-deep);
+  padding-top:14px;
+}
+.transform-note a{ color:var(--vermillion); cursor:pointer; text-decoration:underline; }
+
+.changing-lines{
+  margin-top:14px;
+  text-align:left;
+  font-size:13.5px;
+  color:var(--ink-soft);
+  border-top:1px solid var(--paper-deep);
+  padding-top:12px;
+}
+.changing-lines h4{
+  font-variant:small-caps;
+  letter-spacing:0.1em;
+  font-size:13px;
+  color:var(--vermillion-deep);
+  margin-bottom:6px;
+}
+.changing-lines div{ margin-bottom:3px; }
+
+.stamp{
+  position:absolute; top:20px; right:20px;
+  width:46px; height:46px;
+  background:var(--vermillion);
+  color:var(--paper);
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Ma Shan Zheng', cursive;
+  font-size:24px;
+  border-radius:3px;
+  transform:scale(2.2) rotate(-8deg);
+  opacity:0;
+}
+.stamp.stamp-in{ animation:stamp-down .5s cubic-bezier(.3,1.4,.5,1) forwards; }
+@keyframes stamp-down{
+  0%{ transform:scale(2.4) rotate(-8deg); opacity:0; }
+  60%{ transform:scale(0.9) rotate(-8deg); opacity:1; }
+  100%{ transform:scale(1) rotate(-8deg); opacity:1; }
+}
+
+#screen-transform{ margin-top:16px; }
+
+/* ============================================================
+   MINIJUEGO — Acertijos del Sabio
+   ============================================================ */
+.overlay{
+  position:fixed; inset:0; z-index:50;
+  background:rgba(20,14,9,0.55);
+  display:flex; align-items:center; justify-content:center;
+  padding:20px;
+  opacity:0;
+  pointer-events:none;
+  transition:opacity .25s ease;
+}
+.overlay.visible{ opacity:1; pointer-events:auto; }
+
+.game-window{
+  width:100%; max-width:440px;
+  max-height:88vh;
+  overflow-y:auto;
+  background:linear-gradient(160deg, var(--paper-2), var(--paper));
+  border-radius:8px;
+  box-shadow:0 20px 60px rgba(0,0,0,0.45);
+  padding:28px 24px;
+  position:relative;
+  text-align:center;
+}
+
+.game-close{
+  position:absolute; top:14px; right:14px;
+  width:32px; height:32px;
+  border-radius:50%;
+  border:none;
+  background:rgba(43,32,24,0.08);
+  color:var(--ink-soft);
+  font-size:16px;
+  cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+}
+.game-close:hover{ background:rgba(168,52,31,0.15); color:var(--vermillion); }
+
+.game-title{
+  font-family:'Noto Serif SC', serif;
+  font-weight:700;
+  font-size:24px;
+  margin-bottom:10px;
+}
+.game-intro-text{
+  font-size:15.5px;
+  line-height:1.6;
+  color:var(--ink-soft);
+  margin-bottom:22px;
+}
+
+.game-progress{
+  display:flex; justify-content:space-between;
+  font-family:'EB Garamond', serif;
+  font-variant:small-caps;
+  letter-spacing:0.05em;
+  font-size:13px;
+  color:var(--ink-soft);
+  margin-bottom:16px;
+}
+
+.game-tag{
+  display:inline-block;
+  font-size:11px;
+  font-variant:small-caps;
+  letter-spacing:0.1em;
+  color:var(--vermillion-deep);
+  border:1px solid var(--vermillion-deep);
+  border-radius:20px;
+  padding:2px 10px;
+  margin-bottom:12px;
+}
+
+.game-question{
+  font-size:18px;
+  line-height:1.5;
+  font-weight:600;
+  margin-bottom:20px;
+  text-align:left;
+}
+
+.game-options{
+  display:flex; flex-direction:column; gap:10px;
+  margin-bottom:16px;
+}
+.game-option{
+  font-family:'EB Garamond', serif;
+  font-size:15.5px;
+  text-align:left;
+  background:rgba(255,255,255,0.35);
+  border:1px solid var(--paper-deep);
+  border-radius:5px;
+  padding:12px 14px;
+  cursor:pointer;
+  transition:all .15s ease;
+  color:var(--ink);
+}
+.game-option:hover:not(:disabled){ border-color:var(--vermillion); background:rgba(255,255,255,0.55); }
+.game-option:disabled{ cursor:default; }
+.game-option.correct{ background:rgba(79,106,82,0.25); border-color:var(--jade-deep); font-weight:600; }
+.game-option.incorrect{ background:rgba(168,52,31,0.18); border-color:var(--vermillion-deep); }
+
+.game-reveal-btn{
+  font-family:'EB Garamond', serif;
+  font-variant:small-caps;
+  font-size:15px;
+  background:var(--ink);
+  color:var(--paper);
+  border:none;
+  border-radius:5px;
+  padding:12px 20px;
+  cursor:pointer;
+  width:100%;
+}
+.game-reveal-btn:hover{ background:var(--vermillion-deep); }
+
+.game-feedback{
+  text-align:left;
+  font-size:14.5px;
+  line-height:1.6;
+  padding:14px;
+  border-radius:5px;
+  margin-bottom:16px;
+}
+.game-feedback.is-correct{ background:rgba(79,106,82,0.15); color:var(--jade-deep); }
+.game-feedback.is-incorrect{ background:rgba(168,52,31,0.1); color:var(--vermillion-deep); }
+.game-feedback.is-revealed{ background:rgba(156,122,60,0.15); color:var(--ink-soft); }
+.game-feedback strong{ display:block; margin-bottom:4px; color:var(--ink); }
+
+.mini-answer-check{
+  display:flex; align-items:center; gap:10px; margin-top:12px;
+  flex-wrap:wrap;
+}
+.mini-btn{
+  font-family:'EB Garamond', serif;
+  font-size:13px;
+  background:none;
+  border:1px solid var(--ink-soft);
+  border-radius:20px;
+  padding:5px 14px;
+  cursor:pointer;
+  color:var(--ink-soft);
+}
+.mini-btn:hover:not(:disabled){ border-color:var(--vermillion); color:var(--vermillion); }
+.mini-btn:disabled{ opacity:0.45; cursor:default; }
+
+.game-final-score{
+  font-size:20px;
+  font-weight:600;
+  margin-bottom:8px;
+}
+.game-final-rank{
+  font-family:'Ma Shan Zheng', cursive;
+  font-size:24px;
+  color:var(--vermillion-deep);
+  margin-bottom:22px;
+}
+
+.nav-links{
+  display:flex; gap:18px; margin-top:26px;
+  font-family:'EB Garamond', serif;
+  font-variant:small-caps;
+  font-size:13px;
+  letter-spacing:0.05em;
+}
+.nav-links button{
+  background:none; border:none; cursor:pointer;
+  color:var(--ink-soft);
+  text-decoration:underline;
+  padding:0;
+}
+.nav-links button:hover{ color:var(--vermillion); }
+
+@media (prefers-reduced-motion: reduce){
+  .scroll{ transition:none; }
+  .line-row{ animation:none; opacity:1; transform:none; }
+  .expand-block{ transition:none; }
+}
+
+@media (max-width: 400px){
+  .altar{ width:240px; height:170px; }
+  .coin{ width:50px; height:50px; }
+}
