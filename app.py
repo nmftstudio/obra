@@ -1,525 +1,343 @@
-import hashlib
-import unicodedata
-import re
-from datetime import datetime, date
-from io import BytesIO
-import random
-
-import requests
 import streamlit as st
-from PIL import Image, ImageFilter, ImageDraw
+import streamlit.components.v1 as components
+from PIL import Image, ImageDraw
+import datetime
+import hashlib
+import random
+import io
+import requests
 
-# ──────────────────────────────────────────────
-# DATASET — 17 obras de dominio público (Wikimedia Commons)
-# ──────────────────────────────────────────────
-PAINTINGS = [
+# ==========================================
+# CONFIGURACIÓN DE LA PÁGINA Y ESTILOS CSS
+# ==========================================
+st.set_page_config(
+    page_title="La Obra Misteriosa - NMFT Studio",
+    page_icon="🎨",
+    layout="centered",
+    initial_sidebar_state="collapsed"
+)
+
+# Inyección de CSS Personalizado (Estética Indie / Dark Mode / Glassmorphism)
+st.markdown("""
+    <style>
+    /* Fondo general y fuentes */
+    .stApp {
+        background-color: #0d0e15;
+        color: #e2e8f0;
+        font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    }
+    
+    /* Contenedor principal estilo Glassmorphism */
+    .main-container {
+        background: rgba(22, 25, 41, 0.7);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border-radius: 16px;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        padding: 25px;
+        margin-bottom: 20px;
+        box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    }
+    
+    /* Título estilizado */
+    .titulo-juego {
+        font-size: 2.2rem;
+        font-weight: 800;
+        background: linear-gradient(45deg, #ff79c6, #bd93f9, #8be9fd);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        text-align: center;
+        margin-bottom: 5px;
+    }
+    
+    .subtitulo-juego {
+        font-size: 1rem;
+        color: #6272a4;
+        text-align: center;
+        margin-bottom: 25px;
+    }
+
+    /* Ajustes para inputs y selectbox dentro del entorno oscuro */
+    .stSelectbox label {
+        color: #ffb86c !important;
+        font-weight: 600;
+    }
+    
+    /* Mensajes de feedback */
+    .stAlert {
+        border-radius: 10px !important;
+        background-color: rgba(40, 42, 54, 0.8) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }
+    
+    /* Botones personalizados */
+    div.stButton > button:first-child {
+        background: linear-gradient(135deg, #6272a4 0%, #44475a 100%);
+        color: #f8f8f2;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        padding: 10px 20px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        width: 100%;
+    }
+    
+    div.stButton > button:first-child:hover {
+        background: linear-gradient(135deg, #bd93f9 0%, #ff79c6 100%);
+        color: #ffffff;
+        border-color: transparent;
+        box-shadow: 0 4px 15px rgba(189, 147, 249, 0.4);
+        transform: translateY(-1px);
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# ==========================================
+# BANCO DE DATOS DE OBRAS DE ARTE
+# ==========================================
+OBRAS = [
     {
-        "id": "mona-lisa",
-        "title": "La Mona Lisa",
-        "artist": "Leonardo da Vinci",
-        "year": "c. 1503–1517",
-        "museum": "Museo del Louvre, París",
-        "file": "Mona_Lisa,_by_Leonardo_da_Vinci,_from_C2RMF_retouched.jpg",
-        "fun_fact": "Fue robada del Louvre en 1911 por un empleado del museo, lo que la catapultó a la fama mundial.",
+        "id": 1,
+        "titulo": "La Noche Estrellada",
+        "autor": "Vincent van Gogh",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ea/Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg/600px-Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg",
+        "colores_respaldo": ["#1a2a6c", "#b21f1f", "#fdbb2d"]
     },
     {
-        "id": "starry-night",
-        "title": "La Noche Estrellada",
-        "artist": "Vincent van Gogh",
-        "year": "1889",
-        "museum": "MoMA, Nueva York",
-        "file": "Van_Gogh_-_Starry_Night_-_Google_Art_Project.jpg",
-        "fun_fact": "Van Gogh la pintó desde la ventana de su cuarto en un sanatorio psiquiátrico.",
+        "id": 2,
+        "titulo": "El Grito",
+        "autor": "Edvard Munch",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/c5/Edvard_Munch%2C_1893%2C_The_Scream%2C_oil%2C_tempera_and_pastel_on_cardboard%2C_91_x_73.5_cm%2C_National_Gallery_of_Norway.jpg/450px-Edvard_Munch%2C_1893%2C_The_Scream%2C_oil%2C_tempera_and_pastel_on_cardboard%2C_91_x_73.5_cm%2C_National_Gallery_of_Norway.jpg",
+        "colores_respaldo": ["#e65c00", "#f9d423", "#2193b0"]
     },
     {
-        "id": "the-scream",
-        "title": "El Grito",
-        "artist": "Edvard Munch",
-        "year": "1893",
-        "museum": "Galería Nacional de Noruega, Oslo",
-        "file": "Edvard_Munch,_1893,_The_Scream,_oil,_tempera_and_pastel_on_cardboard,_91_x_73_cm,_National_Gallery_of_Norway.jpg",
-        "fun_fact": "Munch la pintó tras sentir 'un grito infinito atravesando la naturaleza' durante un atardecer.",
+        "id": 3,
+        "titulo": "La Mona Lisa",
+        "autor": "Leonardo da Vinci",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/e/ec/Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg/402px-Mona_Lisa%2C_by_Leonardo_da_Vinci%2C_from_C2RMF_retouched.jpg",
+        "colores_respaldo": ["#3d3d29", "#261a0d", "#5c5c3d"]
     },
     {
-        "id": "pearl-earring",
-        "title": "La Joven de la Perla",
-        "artist": "Johannes Vermeer",
-        "year": "c. 1665",
-        "museum": "Mauritshuis, La Haya",
-        "file": "1665_Girl_with_a_Pearl_Earring.jpg",
-        "fun_fact": "No es un retrato real sino un 'tronie', un estudio de expresión típico del barroco holandés.",
+        "id": 4,
+        "titulo": "La Joven de la Perla",
+        "autor": "Johannes Vermeer",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0f/1665_Girl_with_a_Pearl_Earring.jpg/416px-1665_Girl_with_a_Pearl_Earring.jpg",
+        "colores_respaldo": ["#002147", "#cc9933", "#111111"]
     },
     {
-        "id": "great-wave",
-        "title": "La Gran Ola de Kanagawa",
-        "artist": "Katsushika Hokusai",
-        "year": "c. 1831",
-        "museum": "Varios museos (xilografía)",
-        "file": "The_Great_Wave_off_Kanagawa.jpg",
-        "fun_fact": "Es un grabado en madera, no una pintura única: se imprimieron miles de copias en su época.",
+        "id": 5,
+        "titulo": "El Nacimiento de Venus",
+        "autor": "Sandro Botticelli",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0b/Sandro_Botticelli_-_La_nascita_di_Venere_-_Google_Art_Project.jpg/640px-Sandro_Botticelli_-_La_nascita_di_Venere_-_Google_Art_Project.jpg",
+        "colores_respaldo": ["#e0c3fc", "#8ec5fc", "#fbc2eb"]
     },
     {
-        "id": "american-gothic",
-        "title": "Gótico Americano",
-        "artist": "Grant Wood",
-        "year": "1930",
-        "museum": "Art Institute of Chicago",
-        "file": "Grant_Wood_-_American_Gothic_-_Google_Art_Project.jpg",
-        "fun_fact": "Los modelos fueron la hermana del pintor y su dentista, no una pareja de granjeros real.",
+        "id": 6,
+        "titulo": "La Persistencia de la Memoria",
+        "autor": "Salvador Dalí",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/2c/The_Persistence_of_Memory.jpg/600px-The_Persistence_of_Memory.jpg",
+        "colores_respaldo": ["#4a3b32", "#8b7355", "#4682b4"]
     },
     {
-        "id": "impression-sunrise",
-        "title": "Impresión, Sol Naciente",
-        "artist": "Claude Monet",
-        "year": "1872",
-        "museum": "Museo Marmottan Monet, París",
-        "file": "Monet_-_Impression,_Sunrise.jpg",
-        "fun_fact": "Le dio nombre a todo el movimiento Impresionista, usado al principio como burla por la crítica.",
+        "id": 7,
+        "titulo": "Las Meninas",
+        "autor": "Diego Velázquez",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/31/Las_Meninas%2C_by_Diego_Vel%C3%A1zquez%2C_from_Prado_in_Google_Earth.jpg/509px-Las_Meninas%2C_by_Diego_Vel%C3%A1zquez%2C_from_Prado_in_Google_Earth.jpg",
+        "colores_respaldo": ["#2b1d0c", "#423119", "#1a1107"]
     },
     {
-        "id": "birth-of-venus",
-        "title": "El Nacimiento de Venus",
-        "artist": "Sandro Botticelli",
-        "year": "c. 1485",
-        "museum": "Galería Uffizi, Florencia",
-        "file": "Sandro_Botticelli_-_La_nascita_di_Venere_-_Google_Art_Project_-_edited.jpg",
-        "fun_fact": "Está pintada sobre tela en vez de madera, algo inusual para su escala en el siglo XV.",
+        "id": 8,
+        "titulo": "El Beso",
+        "autor": "Gustav Klimt",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/40/The_Kiss_-_Gustav_Klimt_-_Google_Cultural_Institute.jpg/587px-The_Kiss_-_Gustav_Klimt_-_Google_Cultural_Institute.jpg",
+        "colores_respaldo": ["#ffd700", "#b8860b", "#8b6508"]
     },
     {
-        "id": "las-meninas",
-        "title": "Las Meninas",
-        "artist": "Diego Velázquez",
-        "year": "1656",
-        "museum": "Museo del Prado, Madrid",
-        "file": "Las_Meninas,_by_Diego_Vel%C3%A1zquez,_from_Prado_in_Google_Earth.jpg",
-        "fun_fact": "El propio Velázquez se autorretrató en la escena, pincel en mano, mirando al espectador.",
+        "id": 9,
+        "titulo": "Impresión, sol naciente",
+        "autor": "Claude Monet",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/5/5c/Claude_Monet%2C_Impression%2C_soleil_levant.jpg/600px-Claude_Monet%2C_Impression%2C_soleil_levant.jpg",
+        "colores_respaldo": ["#203a43", "#2c5364", "#0f2027"]
     },
     {
-        "id": "night-watch",
-        "title": "La Ronda de Noche",
-        "artist": "Rembrandt van Rijn",
-        "year": "1642",
-        "museum": "Rijksmuseum, Ámsterdam",
-        "file": "The_Night_Watch_-_HD.jpg",
-        "fun_fact": "Pese al nombre, no transcurre de noche: siglos de barniz oscurecido le dieron esa apariencia.",
+        "id": 10,
+        "titulo": "La Gran Ola de Kanagawa",
+        "autor": "Katsushika Hokusai",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/0d/Great_Wave_off_Kanagawa2.jpg/640px-Great_Wave_off_Kanagawa2.jpg",
+        "colores_respaldo": ["#0f2b46", "#e1dcd6", "#1c3b5e"]
     },
     {
-        "id": "the-kiss",
-        "title": "El Beso",
-        "artist": "Gustav Klimt",
-        "year": "1908",
-        "museum": "Belvedere, Viena",
-        "file": "Gustav_Klimt_016.jpg",
-        "fun_fact": "Usó pan de oro real, una técnica heredada del trabajo de orfebre de su padre.",
+        "id": 11,
+        "titulo": "La Libertad guiando al pueblo",
+        "autor": "Eugène Delacroix",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a7/Eug%C3%A8ne_Delacroix_-_Le_28_Juillet._La_Libert%C3%A9_guidant_le_peuple.jpg/563px-Eug%C3%A8ne_Delacroix_-_Le_28_Juillet._La_Libert%C3%A9_guidant_le_peuple.jpg",
+        "colores_respaldo": ["#3e423a", "#7c6c59", "#20221f"]
     },
     {
-        "id": "liberty-leading",
-        "title": "La Libertad Guiando al Pueblo",
-        "artist": "Eugène Delacroix",
-        "year": "1830",
-        "museum": "Museo del Louvre, París",
-        "file": "Eug%C3%A8ne_Delacroix_-_La_libert%C3%A9_guidant_le_peuple.jpg",
-        "fun_fact": "Conmemora la Revolución de Julio de 1830, no la Revolución Francesa de 1789 como muchos creen.",
-    },
-    {
-        "id": "garden-earthly-delights",
-        "title": "El Jardín de las Delicias",
-        "artist": "El Bosco",
-        "year": "c. 1500",
-        "museum": "Museo del Prado, Madrid",
-        "file": "The_Garden_of_earthly_delights.jpg",
-        "fun_fact": "Es un tríptico: al cerrar sus puertas se revela otra pintura del mundo antes de la creación de Eva.",
-    },
-    {
-        "id": "wanderer-fog",
-        "title": "El Caminante sobre el Mar de Nubes",
-        "artist": "Caspar David Friedrich",
-        "year": "c. 1818",
-        "museum": "Kunsthalle de Hamburgo",
-        "file": "Caspar_David_Friedrich_-_Wanderer_above_the_Sea_of_Fog.jpeg",
-        "fun_fact": "Se convirtió en el ícono visual del Romanticismo alemán.",
-    },
-    {
-        "id": "third-of-may",
-        "title": "El Tres de Mayo de 1808",
-        "artist": "Francisco de Goya",
-        "year": "1814",
-        "museum": "Museo del Prado, Madrid",
-        "file": "El_Tres_de_Mayo,_by_Francisco_de_Goya,_from_Prado_in_Google_Earth.jpg",
-        "fun_fact": "Una de las primeras obras que retrata la guerra moderna sin idealizar a los vencedores.",
-    },
-    {
-        "id": "composition-viii",
-        "title": "Composición VIII",
-        "artist": "Vasili Kandinsky",
-        "year": "1923",
-        "museum": "Museo Guggenheim, Nueva York",
-        "file": "Vassily_Kandinsky,_1923_-_Composition_8,_Guggenheim_Museum.jpg",
-        "fun_fact": "Kandinsky sostenía que ciertos colores y formas producían sonidos: sinestesia.",
-    },
-    {
-        "id": "grande-jatte",
-        "title": "Una Tarde de Domingo en la Grande Jatte",
-        "artist": "Georges Seurat",
-        "year": "1884–1886",
-        "museum": "Art Institute of Chicago",
-        "file": "A_Sunday_on_La_Grande_Jatte,_Georges_Seurat,_1884.jpg",
-        "fun_fact": "Pintada con puntillismo: miles de puntitos de color puro que el ojo mezcla a distancia.",
-    },
+        "id": 12,
+        "titulo": "Terraza de café por la noche",
+        "autor": "Vincent van Gogh",
+        "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b0/Vincent_Van_Gogh_-_Caf%C3%A9_Terrace_at_Night_%28YMS_Extract%29.jpg/464px-Vincent_Van_Gogh_-_Caf%C3%A9_Terrace_at_Night_%28YMS_Extract%29.jpg",
+        "colores_respaldo": ["#000046", "#1cb5e0", "#f7b733"]
+    }
 ]
 
-MAX_ATTEMPTS = 6
-BLUR_LEVELS = [28, 20, 13, 7, 3, 0]
-CROP_SIZES = [0.18, 0.30, 0.46, 0.64, 0.82, 1.0]
-
-# ──────────────────────────────────────────────
-# LÓGICA
-# ──────────────────────────────────────────────
-
-def check_choice(correct_painting, selected_id):
-    if selected_id == correct_painting["id"]:
-        return "correct"
-    
-    selected_painting = next(p for p in PAINTINGS if p["id"] == selected_id)
-    if selected_painting["artist"] == correct_painting["artist"]:
-        return "close"
-    return "miss"
-
+# ==========================================
+# LOGICA DE PROCESAMIENTO DE IMÁGENES
+# ==========================================
+def generar_imagen_procedimental(colores, titulo):
+    img = Image.new("RGB", (600, 600), color=colores[0])
+    draw = ImageDraw.Draw(img)
+    semilla = int(hashlib.md5(titulo.encode()).hexdigest(), 16)
+    random.seed(semilla)
+    for _ in range(25):
+        x0 = random.randint(0, 500)
+        y0 = random.randint(0, 500)
+        x1 = x0 + random.randint(50, 250)
+        y1 = y0 + random.randint(50, 250)
+        color = random.choice(colores)
+        draw.ellipse([x0, y0, x1, y1], fill=color, outline=None)
+    return img
 
 @st.cache_data(show_spinner=False)
-def load_image(filename):
-    url = f"https://commons.wikimedia.org/wiki/Special:FilePath/{filename}?width=900"
+def cargar_imagen_obra(obra_dict):
     try:
-        r = requests.get(url, timeout=15, headers={"User-Agent": "ObraMisteriosa/1.0"})
-        r.raise_for_status()
-        img = Image.open(BytesIO(r.content)).convert("RGB")
-        w, h = img.size
-        side = min(w, h)
-        left = (w - side) // 2
-        top = (h - side) // 2
-        return img.crop((left, top, left + side, top + side)).resize((600, 600))
+        response = requests.get(obra_dict["url"], timeout=4)
+        if response.status_code == 200:
+            return Image.open(io.BytesIO(response.content)).convert("RGB")
     except Exception:
-        return None
+        pass
+    return generar_imagen_procedimental(obra_dict["colores_respaldo"], obra_dict["titulo"])
 
+def aplicar_distorsion_mosaico(imagen, nivel_distorsion):
+    if nivel_distorsion <= 0:
+        return imagen
 
-def apply_reveal(img, attempt):
-    step = min(attempt, len(BLUR_LEVELS) - 1)
-    blur_r = BLUR_LEVELS[step]
-    crop_pct = CROP_SIZES[step]
+    ancho_original, alto_original = imagen.size
+    factor = 0.018 + (0.28 * (1.0 - nivel_distorsion))
+    
+    nuevo_ancho = max(6, int(ancho_original * factor))
+    nuevo_alto = max(6, int(alto_original * factor))
+    
+    imagen_pequena = imagen.resize((nuevo_ancho, nuevo_alto), resample=Image.BOX)
+    imagen_pixelada = imagen_pequena.resize((ancho_original, alto_original), resample=Image.NEAREST)
+    
+    return imagen_pixelada
 
-    w, h = img.size
-    if blur_r > 0:
-        blurred = img.filter(ImageFilter.GaussianBlur(radius=blur_r))
-    else:
-        blurred = img.copy()
+# ==========================================
+# LÓGICA DETERMINISTA POR HORA
+# ==========================================
+def obtener_obra_del_periodo():
+    ahora = datetime.datetime.now()
+    id_temporal = ahora.strftime("%Y-%m-%d-%H")
+    hash_digest = hashlib.md5(id_temporal.encode()).hexdigest()
+    indice = int(hash_digest, 16) % len(OBRAS)
+    return OBRAS[indice], id_temporal
 
-    if crop_pct >= 1.0:
-        return blurred
+def generar_12_opciones(obra_correcta):
+    opcion_correcta = f"{obra_correcta['titulo']} — {obra_correcta['autor']}"
+    otras_opciones = [f"{o['titulo']} — {o['autor']}" for o in OBRAS if o["id"] != obra_correcta["id"]]
+    
+    random.seed(obra_correcta["id"])
+    opciones_incorrectas = random.sample(otras_opciones, min(11, len(otras_opciones)))
+    
+    todas_opciones = opciones_incorrectas + [opcion_correcta]
+    todas_opciones.sort()
+    return todas_opciones
 
-    radius = int((w / 2) * crop_pct)
-    cx, cy = w // 2, h // 2
+# ==========================================
+# EFECTO DE CELEBRACIÓN
+# ==========================================
+def lanzar_festejo_confetti():
+    confetti_js = """
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script>
+        var duracion = 4 * 1000;
+        var fin = Date.now() + duracion;
 
-    mask = Image.new("L", (w, h), 0)
-    draw = ImageDraw.Draw(mask)
-    draw.ellipse((cx - radius, cy - radius, cx + radius, cy + radius), fill=255)
-    mask = mask.filter(ImageFilter.GaussianBlur(radius=max(radius // 5, 4)))
+        (function lanzarRáfaga() {
+          confetti({ particleCount: 6, angle: 55, spread: 60, origin: { x: 0, y: 0.8 } });
+          confetti({ particleCount: 6, angle: 125, spread: 60, origin: { x: 1, y: 0.8 } });
+          if (Date.now() < fin) { requestAnimationFrame(lanzarRáfaga); }
+        }());
+    </script>
+    """
+    components.html(confetti_js, height=0, width=0)
 
-    dark = Image.new("RGB", (w, h), (18, 14, 18))
-    result = Image.composite(blurred, dark, mask)
-    return result
-
-# ──────────────────────────────────────────────
-# CSS PERSONALIZADO
-# ──────────────────────────────────────────────
-
-CSS = """
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght=0,600;1,500&family=Inter:wght@400;500;700&display=swap');
-
-html, body, [data-testid="stAppViewContainer"] {
-    background: #141014 !important;
-}
-[data-testid="stAppViewContainer"] > .main {
-    background: #141014;
-}
-[data-testid="stHeader"] { background: transparent !important; }
-[data-testid="stSidebar"] { display: none; }
-
-h1 {
-    font-family: 'Cormorant Garamond', Georgia, serif !important;
-    font-size: 2rem !important;
-    color: #f2ece2 !important;
-    margin-bottom: 0 !important;
-    letter-spacing: 0.02em;
-}
-p, label, .stMarkdown, .stText {
-    font-family: 'Inter', sans-serif !important;
-    color: #a99da2 !important;
-}
-
-div[data-baseweb="select"] {
-    background: #1c161b !important;
-    border-radius: 6px !important;
-}
-div[data-baseweb="select"] > div {
-    background: #1c161b !important;
-    color: #f2ece2 !important;
-    border-color: #3a2f36 !important;
-}
-
-[data-testid="baseButton-primary"] > button,
-.stButton > button[kind="primary"] {
-    background: #c9a227 !important;
-    color: #1c1408 !important;
-    border: none !important;
-    font-weight: 700 !important;
-    border-radius: 6px !important;
-}
-.stButton > button {
-    background: #1c161b !important;
-    color: #c9a227 !important;
-    border: 1px solid #8a7326 !important;
-    border-radius: 6px !important;
-    font-family: 'Inter', sans-serif !important;
-}
-
-[data-testid="stImage"] img {
-    border-radius: 4px;
-    box-shadow:
-        0 0 0 10px #1e1519,
-        0 0 0 12px #3a2f22,
-        0 30px 60px -10px rgba(0,0,0,0.8) !important;
-    display: block;
-    margin: 0 auto;
-}
-
-.dot-row { display: flex; gap: 8px; justify-content: center; margin: 12px 0; }
-.dot {
-    width: 32px; height: 32px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 13px; font-weight: 700;
-    font-family: 'Inter', sans-serif;
-}
-.dot-pending { background:#1c161b; border:1px dashed #3a2f36; color:#6b6069; }
-.dot-miss    { background:#1c161b; border:1px solid #7a2e3a; color:#a83f4f; }
-.dot-close   { background:#1c161b; border:1px solid #8a7326; color:#c9a227; }
-.dot-hit     { background:#7fae6d; border:1px solid #7fae6d; color:#10240c; }
-
-.feedback-miss  { color:#a83f4f; font-weight:600; text-align:center; }
-.feedback-close { color:#c9a227; font-weight:600; text-align:center; }
-.feedback-hit   { color:#7fae6d; font-weight:600; text-align:center; }
-
-.result-card {
-    background: #1c161b;
-    border: 1px solid #3a2f36;
-    border-radius: 8px;
-    padding: 20px 22px;
-    margin-top: 16px;
-}
-.result-title {
-    font-family: 'Cormorant Garamond', Georgia, serif;
-    font-size: 1.6rem;
-    color: #f4e6c1;
-    margin: 0 0 4px;
-}
-.result-meta { color: #8a7326 !important; font-size: 0.8rem !important; margin: 0 0 10px; }
-.result-fact { color: #a99da2 !important; font-size: 0.9rem !important; line-height: 1.5; }
-
-.eyebrow {
-    font-family: 'Inter', sans-serif;
-    font-size: 0.72rem;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    color: #6b6069;
-    text-align: center;
-    margin-bottom: 4px;
-}
-.plaque {
-    font-family: 'Inter', sans-serif;
-    font-size: 0.72rem;
-    letter-spacing: 0.08em;
-    color: #8a7326;
-    text-align: center;
-    margin-top: 8px;
-}
-
-.footer {
-    text-align: center;
-    font-size: 0.75rem;
-    color: #3a2f36;
-    margin-top: 32px;
-    font-family: 'Inter', sans-serif;
-}
-.footer a { color: #8a7326; text-decoration: none; }
-</style>
-"""
-
-# ──────────────────────────────────────────────
-# SESSION STATE
-# ──────────────────────────────────────────────
-
-def init_state():
-    now = datetime.now()
-    hour_seed = f"{now.date().isoformat()}_{now.hour}"
-
-    if "hour_seed" not in st.session_state or st.session_state.hour_seed != hour_seed:
-        st.session_state.hour_seed = hour_seed
-        
-        digest = hashlib.sha256(hour_seed.encode()).hexdigest()
-        seed_int = int(digest, 16)
-        
-        correct_painting = PAINTINGS[seed_int % len(PAINTINGS)]
-        st.session_state.painting = correct_painting
-        
-        r = random.Random(seed_int)
-        other_paintings = [p for p in PAINTINGS if p["id"] != correct_painting["id"]]
-        
-        incorrect_choices = r.sample(other_paintings, min(11, len(other_paintings)))
-        choices = [correct_painting] + incorrect_choices
-        r.shuffle(choices)
-        
-        st.session_state.options = choices
-        st.session_state.attempts = []
-        st.session_state.finished = False
-        st.session_state.won = False
-
-# ──────────────────────────────────────────────
-# APP
-# ──────────────────────────────────────────────
-
+# ==========================================
+# FLUJO PRINCIPAL
+# ==========================================
 def main():
-    st.set_page_config(
-        page_title="La Obra Misteriosa",
-        page_icon="◆",
-        layout="centered",
-    )
-    st.markdown(CSS, unsafe_allow_html=True)
-    init_state()
+    obra_actual, id_hora = obtener_obra_del_periodo()
+    max_intentos = 5
 
-    painting = st.session_state.painting
-    options = st.session_state.options
-    attempts = st.session_state.attempts
-    attempt_count = len(attempts)
+    if "id_hora" not in st.session_state or st.session_state.id_hora != id_hora:
+        st.session_state.id_hora = id_hora
+        st.session_state.intentos_realizados = 0
+        st.session_state.adivinado = False
+        st.session_state.juego_terminado = False
+        st.session_state.historial_bloques = []
+        st.session_state.opciones = generar_12_opciones(obra_actual)
 
-    option_labels = [f"{p['title']} — {p['artist']}" for p in options]
+    st.markdown('<div class="main-container">', unsafe_allow_html=True)
+    st.markdown('<h1 class="titulo-juego">🖼️ La Obra Misteriosa</h1>', unsafe_allow_html=True)
+    st.markdown('<p class="subtitulo-juego">NMFT Studio • Desafío de Reconocimiento Visual Progresivo</p>', unsafe_allow_html=True)
+    
+    imagen_base = cargar_imagen_obra(obra_actual)
+    
+    if st.session_state.adivinado:
+        nivel_distorsion = 0.0
+    else:
+        progreso = st.session_state.intentos_realizados / max_intentos
+        nivel_distorsion = max(0.15, 1.0 - progreso)
 
-    st.markdown('<p class="eyebrow">◆ La Obra Misteriosa</p>', unsafe_allow_html=True)
-    st.title("¿Qué obra es esta?")
+    imagen_renderizada = aplicar_distorsion_mosaico(imagen_base, nivel_distorsion)
+    st.image(imagen_renderizada, use_container_width=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
-    now = datetime.now()
-    fecha_hora = f"{now.strftime('%d/%m/%Y')} · {now.hour}:00 hs"
-    st.markdown(f'<p class="eyebrow">Edición: {fecha_hora}</p>', unsafe_allow_html=True)
+    st.markdown('<div class="main-container">', unsafe_allow_html=True)
+    opcion_correcta_str = f"{obra_actual['titulo']} — {obra_actual['autor']}"
 
-    img = load_image(painting["file"])
+    if st.session_state.adivinado:
+        st.success(f"🎉 ¡Es correcto! La obra es **{obra_actual['titulo']}** de *{obra_actual['autor']}*.")
+        lanzar_festejo_confetti()
+        
+        st.markdown("### Comparte tu resultado")
+        resumen_texto = f"La Obra Misteriosa 🎨\nIntentos: {st.session_state.intentos_realizados}/{max_intentos}\n"
+        resumen_texto += "".join(st.session_state.historial_bloques) + "\n#LaObraMisteriosa #NMFTStudio"
+        st.code(resumen_texto, language="text")
 
-    col1, col2, col3 = st.columns([1, 3, 1])
-    with col2:
-        if img:
-            revealed = apply_reveal(img, attempt_count)
-            st.image(revealed, use_container_width=True)
-            if st.session_state.finished:
-                st.markdown(
-                    f'<p class="plaque">{painting["title"]} · {painting["artist"]}</p>',
-                    unsafe_allow_html=True,
-                )
-            else:
-                remaining = MAX_ATTEMPTS - attempt_count
-                st.markdown(
-                    f'<p class="plaque">{remaining} intento{"s" if remaining != 1 else ""} restante{"s" if remaining != 1 else ""}</p>',
-                    unsafe_allow_html=True,
-                )
-        else:
-            st.warning("No se pudo cargar la imagen. Intentá recargar la página.")
-
-    st.markdown("<br>", unsafe_allow_html=True)
-
-    dots_html = '<div class="dot-row">'
-    for i in range(MAX_ATTEMPTS):
-        if i < len(attempts):
-            r = attempts[i]["result"]
-            cls = f"dot dot-{r}"
-            symbol = "✓" if r == "correct" else ("~" if r == "close" else "✕")
-        else:
-            cls = "dot dot-pending"
-            symbol = str(i + 1)
-        dots_html += f'<div class="{cls}">{symbol}</div>'
-    dots_html += "</div>"
-    st.markdown(dots_html, unsafe_allow_html=True)
-
-    if attempts:
-        last = attempts[-1]
-        r = last["result"]
-        if r == "correct":
-            msg = f"¡Exacto! Es «{painting['title']}»"
-            cls = "hit"
-        elif r == "close":
-            msg = f"¡Mismo artista! Pero no es la obra «{last['guess']}»"
-            cls = "close"
-        else:
-            msg = f"No es «{last['guess']}», seguí intentando"
-            cls = "miss"
-        st.markdown(f'<p class="feedback-{cls}">{msg}</p>', unsafe_allow_html=True)
-
-    if not st.session_state.finished:
-        with st.form("guess_form", clear_on_submit=False):
-            selected_label = st.selectbox(
-                "Selecciona una obra",
-                options=option_labels,
-                index=None,
-                placeholder="Elegí una de las 12 opciones...",
-                label_visibility="collapsed"
+    elif st.session_state.juego_terminado:
+        st.error(f"💥 Se agotaron los intentos. La respuesta correcta era: **{opcion_correcta_str}**")
+        if st.button("Revisar composición limpia"):
+            st.session_state.adivinado = True
+            st.rerun()
+    else:
+        st.info(f"Intento **{st.session_state.intentos_realizados + 1} de {max_intentos}**. Distorsión estructural activa.")
+        
+        with st.form(key="formulario_adivinar"):
+            seleccion = st.selectbox(
+                "¿Qué obra y autor crees que representa este lienzo?",
+                options=st.session_state.opciones,
+                index=0
             )
-            submitted = st.form_submit_button("Adivinar", type="primary", use_container_width=True)
+            boton_enviar = st.form_submit_button(label="Enviar Respuesta ⚡")
+            
+            if boton_enviar:
+                if seleccion == opcion_correcta_str:
+                    st.session_state.adivinado = True
+                    st.session_state.juego_terminado = True
+                    st.session_state.intentos_realizados += 1
+                    st.session_state.historial_bloques.append("🟩")
+                    st.rerun()
+                else:
+                    st.session_state.intentos_realizados += 1
+                    st.session_state.historial_bloques.append("🟥")
+                    if st.session_state.intentos_realizados >= max_intentos:
+                        st.session_state.juego_terminado = True
+                    st.rerun()
 
-        if submitted:
-            if not selected_label:
-                st.warning("Por favor, selecciona una opción antes de confirmar.")
-            else:
-                idx = option_labels.index(selected_label)
-                chosen_painting = options[idx]
-                
-                result = check_choice(painting, chosen_painting["id"])
-                st.session_state.attempts.append({
-                    "guess": chosen_painting["title"], 
-                    "result": result
-                })
-
-                if result == "correct":
-                    st.session_state.finished = True
-                    st.session_state.won = True
-                elif len(st.session_state.attempts) >= MAX_ATTEMPTS:
-                    st.session_state.finished = True
-                    st.session_state.won = False
-
-                st.rerun()
-
-    if st.session_state.finished:
-        won = st.session_state.won
-        emoji_row = ""
-        for a in attempts:
-            r = a["result"]
-            emoji_row += "🟩" if r == "correct" else ("🟨" if r == "close" else "🟥")
-        emoji_row += "⬛" * (MAX_ATTEMPTS - len(attempts))
-
-        st.markdown(
-            f"""
-            <div class="result-card">
-                <p class="result-title">{'¡La identificaste! 🎨' if won else 'Esta vez no salió'}</p>
-                <p class="result-meta">{painting['artist']} · {painting['year']} · {painting['museum']}</p>
-                <p class="result-fact">{painting['fun_fact']}</p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-
-        share_text = f"La Obra Misteriosa — {now.strftime('%Y-%m-%d %H:00')}\\n{emoji_row}\\nnmft.ar"
-        st.code(share_text, language=None)
-        st.caption("Copiá el texto de arriba para compartir tu resultado.")
-
-    st.markdown(
-        '<div class="footer">Un juego de <a href="https://nmft.ar" target="_blank">NMFT STUDIO</a></div>',
-        unsafe_allow_html=True,
-    )
+    st.markdown('</div>', unsafe_allow_html=True)
 
 if __name__ == "__main__":
     main()
