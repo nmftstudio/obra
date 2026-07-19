@@ -1,0 +1,12 @@
+{
+  "name": "Obra del Día",
+  "short_name": "Obra del Día",
+  "description": "Adiviná la pintura del día en seis intentos.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#141014",
+  "theme_color": "#141014",
+  "icons": [
+    { "src": "/assets/favicon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}
